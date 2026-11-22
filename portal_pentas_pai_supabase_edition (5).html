@@ -2246,6 +2246,238 @@
             return (!isNaN(numA) && !isNaN(numB) && numA !== numB) ? numA - numB : noA.localeCompare(noB, undefined, { numeric: true });
         };
 
+        window.escapeHtml = function(str) {
+            return String(str ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        };
+
+        window.renderPeserta = function() {
+            const tbody = document.getElementById('pesertaBody');
+            if (!tbody) return;
+            const filterEl = document.getElementById('filterPesertaLomba');
+            const filter = filterEl ? filterEl.value : 'All';
+
+            let list = filter === 'All'
+                ? [...window.simulasiData]
+                : window.simulasiData.filter(d => window.normalisasiNamaLomba(d.lomba) === window.normalisasiNamaLomba(filter));
+
+            list.sort(window.compareNoUrut);
+
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-16 text-center text-slate-400 font-medium">Belum ada data peserta terdaftar${filter !== 'All' ? ' pada kategori lomba ini' : ''}.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = list.map((p) => {
+                const noTampil = window.formatDuaDigit(p.noPeserta || '-');
+                const safeId = window.escapeHtml(p.id);
+                const safeNama = window.escapeHtml(p.nama);
+                const safeSekolah = window.escapeHtml(p.sekolah);
+                const safeLomba = window.escapeHtml(window.normalisasiNamaLomba(p.lomba));
+                const canModify = window.currentUserRole === 'admin' || (window.currentUserRole === 'sekolah' && p.sekolah === window.currentSchoolName);
+
+                return `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center min-w-[2.5rem] px-2.5 py-1 rounded-lg text-sm font-extrabold bg-purple-50 text-purple-800 border border-purple-200">${window.escapeHtml(noTampil)}</span>
+                        </td>
+                        <td class="px-6 py-3.5 font-bold text-slate-800 text-sm">${safeNama}</td>
+                        <td class="px-6 py-3.5 text-sm font-medium text-slate-600">${safeSekolah}</td>
+                        <td class="px-6 py-3.5">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-pai-50 text-pai-700 border border-pai-200">${safeLomba}</span>
+                        </td>
+                        <td class="px-6 py-3.5 text-center">
+                            ${canModify ? `
+                            <div class="flex items-center justify-center gap-1.5">
+                                <button type="button" onclick="window.editPeserta('${safeId}')" class="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 p-2 rounded-lg text-xs transition-all" title="Edit Peserta">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button type="button" onclick="window.hapusPeserta('${safeId}')" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 p-2 rounded-lg text-xs transition-all" title="Hapus Peserta">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>` : '<span class="text-xs text-slate-300">-</span>'}
+                        </td>
+                    </tr>`;
+            }).join('');
+        };
+
+        window.editPeserta = function(idPeserta) {
+            const p = window.simulasiData.find(x => x.id.toString() === idPeserta.toString());
+            if (!p) return;
+            const isAdmin = window.currentUserRole === 'admin';
+            const isOwnSchool = window.currentUserRole === 'sekolah' && p.sekolah === window.currentSchoolName;
+            if (!isAdmin && !isOwnSchool) return;
+
+            const sortedSchools = [...new Set([...window.daftarSekolah, p.sekolah].filter(Boolean))].sort((a, b) => a.localeCompare(b));
+            const cleanCurrentLomba = window.normalisasiNamaLomba(p.lomba);
+
+            Swal.fire({
+                title: 'Edit Data Peserta',
+                html: `
+                    <div class="text-left text-xs space-y-3">
+                        <div>
+                            <label class="font-bold text-slate-700 block mb-1">Nama Peserta / Anggota Regu:</label>
+                            <input id="sw-edit-nama" class="swal2-input text-xs w-full m-0" value="${window.escapeHtml(p.nama)}">
+                        </div>
+                        <div>
+                            <label class="font-bold text-slate-700 block mb-1">Asal Sekolah:</label>
+                            <select id="sw-edit-sekolah" class="swal2-select text-xs w-full m-0" ${!isAdmin ? 'disabled' : ''}>
+                                ${sortedSchools.map(s => `<option value="${window.escapeHtml(s)}" ${s === p.sekolah ? 'selected' : ''}>${window.escapeHtml(s)}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="font-bold text-slate-700 block mb-1">Kategori Lomba:</label>
+                            <select id="sw-edit-lomba" class="swal2-select text-xs w-full m-0">
+                                ${window.kategoriLomba.map(k => {
+                                    const nm = window.normalisasiNamaLomba(k.nama);
+                                    return `<option value="${window.escapeHtml(nm)}" ${nm === cleanCurrentLomba ? 'selected' : ''}>${window.escapeHtml(nm)}</option>`;
+                                }).join('')}
+                            </select>
+                        </div>
+                        ${isAdmin ? `
+                        <div>
+                            <label class="font-bold text-slate-700 block mb-1">Nomor Tampil (2 Digit):</label>
+                            <input id="sw-edit-no" class="swal2-input text-xs w-full m-0 font-bold" value="${window.escapeHtml(p.noPeserta === '-' ? '' : p.noPeserta)}" placeholder="01">
+                        </div>` : ''}
+                    </div>`,
+                showCancelButton: true,
+                confirmButtonText: '<i class="fas fa-save mr-1"></i> Simpan Perubahan',
+                cancelButtonText: 'Batal',
+                confirmButtonColor: '#059669',
+                preConfirm: () => {
+                    const nama = (document.getElementById('sw-edit-nama')?.value || '').trim();
+                    const sekolah = isAdmin ? (document.getElementById('sw-edit-sekolah')?.value || p.sekolah) : p.sekolah;
+                    const lomba = window.normalisasiNamaLomba(document.getElementById('sw-edit-lomba')?.value || p.lomba);
+                    const noRaw = isAdmin ? (document.getElementById('sw-edit-no')?.value || '').trim() : p.noPeserta;
+                    const no_peserta = noRaw ? window.formatDuaDigit(noRaw) : (window.noUrutSekolahMap[sekolah] ? window.formatDuaDigit(window.noUrutSekolahMap[sekolah]) : '-');
+                    if (!nama) {
+                        Swal.showValidationMessage('Nama peserta wajib diisi!');
+                        return false;
+                    }
+                    return { nama, sekolah, lomba, no_peserta };
+                }
+            }).then(async (res) => {
+                if (res.isConfirmed && res.value) {
+                    Swal.fire({ title: 'Menyimpan Perubahan...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                    const { error } = await supabaseClient.from('peserta').update(res.value).eq('id', p.id);
+                    if (error) {
+                        Swal.fire('Gagal Menyimpan', error.message, 'error');
+                    } else {
+                        await window.fetchDataFromServer(false);
+                        Swal.fire({ icon: 'success', title: 'Data Peserta Diperbarui!', timer: 1200, showConfirmButton: false });
+                    }
+                }
+            });
+        };
+
+        window.hapusPeserta = function(idPeserta) {
+            const p = window.simulasiData.find(x => x.id.toString() === idPeserta.toString());
+            if (!p) return;
+            const isAdmin = window.currentUserRole === 'admin';
+            const isOwnSchool = window.currentUserRole === 'sekolah' && p.sekolah === window.currentSchoolName;
+            if (!isAdmin && !isOwnSchool) return;
+
+            Swal.fire({
+                title: 'Hapus Peserta?',
+                html: `Apakah Anda yakin ingin menghapus <b>${window.escapeHtml(p.nama)}</b> (${window.escapeHtml(p.sekolah)}) dari cabang <b>${window.escapeHtml(p.lomba)}</b>?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                confirmButtonText: 'Ya, Hapus',
+                cancelButtonText: 'Batal'
+            }).then(async (r) => {
+                if (r.isConfirmed) {
+                    Swal.fire({ title: 'Menghapus Peserta...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                    const { error } = await supabaseClient.from('peserta').delete().eq('id', p.id);
+                    if (error) {
+                        Swal.fire('Gagal Menghapus', error.message, 'error');
+                    } else {
+                        await window.fetchDataFromServer(false);
+                        Swal.fire({ icon: 'success', title: 'Peserta Dihapus!', timer: 1200, showConfirmButton: false });
+                    }
+                }
+            });
+        };
+
+        window.downloadTemplateExcel = function() {
+            if (typeof XLSX === 'undefined') return;
+            const wb = XLSX.utils.book_new();
+            const sample = [
+                { "Nomor Tampil": "01", "Nama Peserta": "Ahmad Farhan", "Asal Sekolah": window.daftarSekolah[0] || "SDN BANTARGEBANG 1", "Kategori Lomba": window.normalisasiNamaLomba(window.kategoriLomba[0]?.nama || "MTQ Putra") }
+            ];
+            const ws = XLSX.utils.json_to_sheet(sample);
+            XLSX.utils.book_append_sheet(wb, ws, "Template Peserta");
+            XLSX.writeFile(wb, `Template_Peserta_PENTAS_PAI_${window.tahunPelaksanaan || '2026'}.xlsx`);
+        };
+
+        window.exportPesertaExcel = function() {
+            if (typeof XLSX === 'undefined') return;
+            const sorted = [...window.simulasiData].sort(window.compareNoUrut);
+            const rows = sorted.map((p, idx) => ({
+                "No": idx + 1,
+                "Nomor Tampil": window.formatDuaDigit(p.noPeserta),
+                "Nama Peserta": p.nama,
+                "Asal Sekolah": p.sekolah,
+                "Kategori Lomba": window.normalisasiNamaLomba(p.lomba),
+                "Skor Akhir": p.skor || 0
+            }));
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(rows);
+            XLSX.utils.book_append_sheet(wb, ws, "Data Peserta");
+            XLSX.writeFile(wb, `Data_Peserta_PENTAS_PAI_${window.namaKecamatan || 'Bekasi'}_${window.tahunPelaksanaan || '2026'}.xlsx`);
+        };
+
+        window.importPesertaExcel = function(event) {
+            const file = event.target?.files?.[0];
+            if (!file || typeof XLSX === 'undefined') return;
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const wb = XLSX.read(data, { type: 'array' });
+                    const sheet = wb.Sheets[wb.SheetNames[0]];
+                    const jsonRows = XLSX.utils.sheet_to_json(sheet);
+                    const rowsToInsert = jsonRows.map((r, idx) => {
+                        const nama = String(r['Nama Peserta'] || r['nama'] || r['Nama'] || '').trim();
+                        const sekolah = String(r['Asal Sekolah'] || r['sekolah'] || r['Sekolah'] || '').trim();
+                        const lomba = window.normalisasiNamaLomba(r['Kategori Lomba'] || r['lomba'] || r['Lomba'] || '');
+                        const noRaw = String(r['Nomor Tampil'] || r['no_peserta'] || r['No Tampil'] || '').trim();
+                        const noPeserta = noRaw ? window.formatDuaDigit(noRaw) : (window.noUrutSekolahMap[sekolah] ? window.formatDuaDigit(window.noUrutSekolahMap[sekolah]) : '-');
+                        if (!nama || !sekolah || !lomba) return null;
+                        return {
+                            id: 'PST-' + Date.now() + '-' + idx + '-' + Math.floor(Math.random() * 1000),
+                            no_peserta: noPeserta,
+                            nama,
+                            sekolah,
+                            lomba,
+                            skor_akhir: 0,
+                            skor_j1: 0,
+                            skor_j2: 0,
+                            rincian_skor: {}
+                        };
+                    }).filter(Boolean);
+
+                    if (rowsToInsert.length === 0) {
+                        Swal.fire('Data Kosong', 'Pastikan kolom Nama Peserta, Asal Sekolah, dan Kategori Lomba terisi.', 'warning');
+                        return;
+                    }
+                    Swal.fire({ title: `Mengimpor ${rowsToInsert.length} Peserta...`, allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                    const { error } = await supabaseClient.from('peserta').insert(rowsToInsert);
+                    if (error) throw error;
+                    await window.fetchDataFromServer(false);
+                    Swal.fire({ icon: 'success', title: `${rowsToInsert.length} Peserta Diimpor!`, timer: 1400, showConfirmButton: false });
+                } catch (err) {
+                    Swal.fire('Gagal Impor Excel', err.message || String(err), 'error');
+                }
+                if (event.target) event.target.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        };
+
         window.buildDokumenCetakPesertaHtml = function(isPrint = false) {
             const thn = window.tahunPelaksanaan || '2026';
             const kec = window.namaKecamatan || 'Bantargebang';
