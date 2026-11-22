@@ -2255,6 +2255,18 @@
                 .replace(/'/g, '&#39;');
         };
 
+        window.isLombaSekolahBerdasarkanNoUrut = function(namaLomba) {
+            const u = window.normalisasiNamaLomba(namaLomba).toUpperCase();
+            return u.includes('CERDAS CERMAT') || u.includes('QASIDAH') || u.includes('QOSIDAH') || u.includes('KOSIDAH');
+        };
+
+        window.getNoTampilPeserta = function(p) {
+            if (!p) return '-';
+            const mapped = p.sekolah && window.noUrutSekolahMap ? window.noUrutSekolahMap[p.sekolah] : null;
+            if (mapped && mapped !== '-') return window.formatDuaDigit(mapped);
+            return window.formatDuaDigit(p.noPeserta || '-');
+        };
+
         window.renderPeserta = function() {
             const tbody = document.getElementById('pesertaBody');
             if (!tbody) return;
@@ -2500,8 +2512,20 @@
             let renderedCount = 0;
 
             daftarCabang.forEach((namaCabang) => {
+                const useNamaSekolah = jenisDokumen === 'form-penilaian' && window.isLombaSekolahBerdasarkanNoUrut(namaCabang);
                 let list = window.simulasiData
-                    .filter(d => window.normalisasiNamaLomba(d.lomba) === window.normalisasiNamaLomba(namaCabang));
+                    .filter(d => window.normalisasiNamaLomba(d.lomba) === window.normalisasiNamaLomba(namaCabang))
+                    .map(d => useNamaSekolah ? { ...d, noPeserta: window.getNoTampilPeserta(d) } : d);
+
+                if (useNamaSekolah) {
+                    const seenSekolah = new Set();
+                    list = list.filter(d => {
+                        const key = (d.sekolah || '').trim().toUpperCase();
+                        if (!key || seenSekolah.has(key)) return false;
+                        seenSekolah.add(key);
+                        return true;
+                    });
+                }
 
                 if (jenisDokumen === 'juara') {
                     list = list.sort((a, b) => (b.skor - a.skor) || window.compareNoUrut(a, b));
@@ -2523,11 +2547,12 @@
                 let tbodyHtml = '';
 
                 if (jenisDokumen === 'form-penilaian') {
+                    const labelKolomPeserta = useNamaSekolah ? 'Nama Sekolah' : 'Nama Peserta / Regu';
                     theadHtml = `
                         <tr style="background:#0f172a;color:#ffffff;">
                             <th style="border:1px solid #1e293b;padding:7px 6px;text-align:center;width:36px;">No</th>
                             <th style="border:1px solid #1e293b;padding:7px 6px;text-align:center;width:72px;">No. Tampil</th>
-                            <th style="border:1px solid #1e293b;padding:7px 8px;text-align:left;">Nama Peserta / Regu</th>
+                            <th style="border:1px solid #1e293b;padding:7px 8px;text-align:left;">${labelKolomPeserta}</th>
                             ${kriteriaCabang.map(k => `<th style="border:1px solid #1e293b;padding:6px;text-align:center;width:95px;">${k.label}<br><span style="font-size:9px;font-weight:normal;color:#fde68a;">(${k.min}–${k.max})</span></th>`).join('')}
                             <th style="border:1px solid #1e293b;padding:7px 6px;text-align:center;width:78px;">Total<br><span style="font-size:9px;font-weight:normal;color:#a7f3d0;">(Maks ${maxTotalCabang})</span></th>
                         </tr>`;
@@ -2535,8 +2560,8 @@
                     tbodyHtml = list.length > 0 ? list.map((p, i) => `
                         <tr style="background:${i % 2 === 1 ? '#f8fafc' : '#ffffff'};">
                             <td style="border:1px solid #334155;padding:7px 6px;text-align:center;">${i + 1}</td>
-                            <td style="border:1px solid #334155;padding:7px 6px;text-align:center;font-weight:800;color:#581c87;font-size:12px;">${window.formatDuaDigit(p.noPeserta)}</td>
-                            <td style="border:1px solid #334155;padding:7px 8px;font-weight:700;">${p.nama}</td>
+                            <td style="border:1px solid #334155;padding:7px 6px;text-align:center;font-weight:800;color:#581c87;font-size:12px;">${window.escapeHtml(useNamaSekolah ? window.getNoTampilPeserta(p) : window.formatDuaDigit(p.noPeserta))}</td>
+                            <td style="border:1px solid #334155;padding:7px 8px;font-weight:700;">${window.escapeHtml(useNamaSekolah ? p.sekolah : p.nama)}</td>
                             ${kriteriaCabang.map(() => `<td style="border:1px solid #334155;padding:7px 6px;text-align:center;"></td>`).join('')}
                             <td style="border:1px solid #334155;padding:7px 6px;text-align:center;"></td>
                         </tr>`).join('') : `<tr><td colspan="${kriteriaCabang.length + 4}" style="border:1px solid #334155;padding:16px;text-align:center;color:#64748b;font-style:italic;">Belum ada peserta terdaftar pada cabang lomba ini.</td></tr>`;
@@ -4009,10 +4034,18 @@
                 document.getElementById('wrapperPesertaJuri').classList.remove('hidden'); 
                 document.getElementById('lccSpecialContainer').classList.add('hidden'); 
                 document.getElementById('kriteriaContainer').classList.remove('hidden'); 
-                const p = window.simulasiData.filter(d => window.normalisasiNamaLomba(d.lomba) === cleanVal).sort(window.compareNoUrut); 
+                const useNamaSekolah = window.isLombaSekolahBerdasarkanNoUrut(cleanVal);
+                const p = window.simulasiData
+                    .filter(d => window.normalisasiNamaLomba(d.lomba) === cleanVal)
+                    .map(d => useNamaSekolah ? { ...d, noPeserta: window.getNoTampilPeserta(d) } : d)
+                    .sort(window.compareNoUrut); 
                 const sel = document.getElementById('pesertaPenilaian'); 
                 sel.innerHTML = '<option value="" disabled selected>-- Pilih Nomor Tampil --</option>'; 
-                p.forEach(x => sel.innerHTML += `<option value="${x.id}">No. Tampil: ${window.formatDuaDigit(x.noPeserta)} - ${x.nama}</option>`); 
+                p.forEach(x => {
+                    const labelTampil = useNamaSekolah ? x.sekolah : x.nama;
+                    const noTampil = useNamaSekolah ? window.getNoTampilPeserta(x) : window.formatDuaDigit(x.noPeserta);
+                    sel.innerHTML += `<option value="${window.escapeHtml(x.id)}">No. Tampil: ${window.escapeHtml(noTampil)} - ${window.escapeHtml(labelTampil)}</option>`;
+                }); 
                 sel.disabled = p.length === 0;
             }
         };
@@ -4159,10 +4192,11 @@
             const head = document.getElementById('rekapHead'), body = document.getElementById('rekapBody');
             if (!head || !body) return;
 
+            const useNamaSekolah = window.isLombaSekolahBerdasarkanNoUrut(jLomba);
             head.innerHTML = `
                 <tr class="bg-blue-900 text-white">
                     <th class="px-4 py-3 text-center text-xs uppercase w-20 bg-blue-900">No Tampil</th>
-                    <th class="px-4 py-3 text-left text-xs uppercase bg-blue-900">Nama Peserta</th>
+                    <th class="px-4 py-3 text-left text-xs uppercase bg-blue-900">${useNamaSekolah ? 'Nama Sekolah' : 'Nama Peserta'}</th>
                     ${allK.map(k => {
                         const ketTarget = (jmlJuri === 2 && cfgLomba.modeDuaJuri === 'terpisah' && k.juriTarget !== 'all')
                             ? `<span class="text-[10px] text-rose-300 font-extrabold">(Khusus Juri ${k.juriTarget})</span>`
@@ -4175,7 +4209,10 @@
                     <th class="px-4 py-3 text-center text-xs uppercase w-28 bg-blue-900">Koreksi</th>
                 </tr>`;
 
-            const listP = window.simulasiData.filter(d => window.normalisasiNamaLomba(d.lomba) === jLomba).sort(window.compareNoUrut);
+            const listP = window.simulasiData
+                .filter(d => window.normalisasiNamaLomba(d.lomba) === jLomba)
+                .map(d => useNamaSekolah ? { ...d, noPeserta: window.getNoTampilPeserta(d) } : d)
+                .sort(window.compareNoUrut);
             if (listP.length === 0) { body.innerHTML = `<tr><td colspan="${allK.length + 6}" class="text-center py-10 text-slate-400">Belum ada peserta pada cabang lomba ini.</td></tr>`; return; }
 
             body.innerHTML = listP.map(p => {
@@ -4185,10 +4222,12 @@
                 const sumR2 = Object.values(r2).reduce((a, b) => a + (parseFloat(b) || 0), 0);
                 const t1 = (p.detailSkor && p.detailSkor[1] > 0) ? p.detailSkor[1] : sumR1;
                 const t2 = jmlJuri >= 2 ? ((p.detailSkor && p.detailSkor[2] > 0) ? p.detailSkor[2] : sumR2) : 0;
+                const noTampil = useNamaSekolah ? window.getNoTampilPeserta(p) : window.formatDuaDigit(p.noPeserta);
+                const namaTampil = useNamaSekolah ? p.sekolah : p.nama;
                 return `
                     <tr class="border-b hover:bg-slate-50">
-                        <td class="px-4 py-3 text-center font-extrabold text-purple-900">${window.formatDuaDigit(p.noPeserta)}</td>
-                        <td class="px-4 py-3 font-bold text-slate-800">${p.nama}</td>
+                        <td class="px-4 py-3 text-center font-extrabold text-purple-900">${window.escapeHtml(noTampil)}</td>
+                        <td class="px-4 py-3 font-bold text-slate-800">${window.escapeHtml(namaTampil)}</td>
                         ${allK.map(k => {
                             const aktifJ1 = window.apakahKriteriaAktifUntukJuri(jLomba, k, 1);
                             const aktifJ2 = jmlJuri >= 2 && window.apakahKriteriaAktifUntukJuri(jLomba, k, 2);
