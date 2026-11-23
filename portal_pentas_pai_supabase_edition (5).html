@@ -1107,9 +1107,14 @@
                             <h2 class="text-2xl font-extrabold text-slate-800">Daftar Akun Dewan Juri</h2>
                             <p class="text-slate-500 mt-1 font-medium">Tambah, edit sandi, atau hapus akun juri per cabang lomba.</p>
                         </div>
-                        <button onclick="window.bukaModalTambahJuri()" class="bg-pai-600 hover:bg-pai-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2">
-                            <i class="fas fa-user-plus"></i> Tambah Akun Juri
-                        </button>
+                        <div class="flex flex-wrap items-center gap-2.5">
+                            <button type="button" onclick="window.cetakKartuLoginJuri()" class="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2">
+                                <i class="fas fa-id-card"></i> Cetak Kartu Juri
+                            </button>
+                            <button type="button" onclick="window.bukaModalTambahJuri()" class="bg-pai-600 hover:bg-pai-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2">
+                                <i class="fas fa-user-plus"></i> Tambah Akun Juri
+                            </button>
+                        </div>
                     </div>
                     <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200 mb-12">
                         <div class="overflow-x-auto">
@@ -4746,15 +4751,165 @@
             const tbody = document.getElementById('tabelJuriBody');
             if (!tbody) return; tbody.innerHTML = '';
             window.dataJuri.forEach(j => {
+                const safeId = window.escapeHtml(j.id);
                 tbody.innerHTML += `
-                    <tr class="border-b">
-                        <td class="px-6 py-4 font-bold text-slate-800">${j.nama}</td>
-                        <td class="px-6 py-4 text-sm font-semibold text-slate-600">Juri ${j.juriKe} - ${window.normalisasiNamaLomba(j.lomba)}</td>
-                        <td class="px-6 py-4 font-mono font-bold text-purple-800">${j.password}</td>
+                    <tr class="border-b hover:bg-slate-50">
+                        <td class="px-6 py-4 font-bold text-slate-800">${window.escapeHtml(j.nama)}</td>
+                        <td class="px-6 py-4 text-sm font-semibold text-slate-600">Juri ${window.escapeHtml(j.juriKe)} - ${window.escapeHtml(window.normalisasiNamaLomba(j.lomba))}</td>
+                        <td class="px-6 py-4 font-mono font-bold text-purple-800">${window.escapeHtml(j.password)}</td>
                         <td class="px-6 py-4 text-center">
-                            <button onclick="window.delJuri('${j.id}')" class="text-red-600 bg-red-50 hover:bg-red-100 p-2 rounded-lg"><i class="fas fa-trash"></i></button>
+                            <div class="flex items-center justify-center gap-1.5">
+                                <button type="button" onclick="window.cetakKartuLoginJuri('${safeId}')" class="text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-2 rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1" title="Cetak Kartu Login Juri">
+                                    <i class="fas fa-id-card"></i> Kartu
+                                </button>
+                                <button type="button" onclick="window.delJuri('${safeId}')" class="text-red-600 bg-red-50 hover:bg-red-100 p-2 rounded-lg transition-all" title="Hapus Akun Juri"><i class="fas fa-trash"></i></button>
+                            </div>
                         </td>
                     </tr>`;
+            });
+        };
+
+        window.buildKartuJuriHtml = function(listJuri, isPrint = false) {
+            const kec = window.namaKecamatan || 'Bantargebang';
+            const thn = window.tahunPelaksanaan || '2026';
+            const portalUrl = window.location.origin || window.location.href.split('#')[0];
+            const logoHtml = (window.appLogoDataUrl && window.appLogoDataUrl.startsWith('data:image'))
+                ? `<img src="${window.appLogoDataUrl}" alt="Logo" style="width:40px;height:40px;object-fit:contain;background:#fff;border-radius:8px;padding:3px;flex-shrink:0;">`
+                : `<div style="width:40px;height:40px;border-radius:8px;background:rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;color:#fde68a;font-weight:900;font-size:15px;flex-shrink:0;">PAI</div>`;
+
+            const cardsHtml = listJuri.map((j) => {
+                const nama = window.escapeHtml(j.nama);
+                const lomba = window.escapeHtml(window.normalisasiNamaLomba(j.lomba));
+                const juriKe = window.escapeHtml(j.juriKe || 1);
+                const password = window.escapeHtml(j.password || '-');
+                const akunLabel = `${nama} - Juri ${juriKe} (${lomba})`;
+
+                return `
+                    <div style="border:2px solid #065f46;border-radius:14px;overflow:hidden;background:#ffffff;page-break-inside:avoid;break-inside:avoid;box-shadow:0 2px 6px rgba(15,23,42,0.08);display:flex;flex-direction:column;">
+                        <div style="background:linear-gradient(135deg,#064e3b,#047857);color:#ffffff;padding:10px 14px;display:flex;align-items:center;gap:10px;">
+                            ${logoHtml}
+                            <div style="text-align:left;line-height:1.25;">
+                                <div style="font-size:9px;font-weight:800;letter-spacing:0.8px;color:#fde68a;text-transform:uppercase;">KARTU LOGIN DEWAN JURI</div>
+                                <div style="font-size:12px;font-weight:900;text-transform:uppercase;">PENTAS PAI ${window.escapeHtml(kec.toUpperCase())} ${window.escapeHtml(thn)}</div>
+                            </div>
+                        </div>
+                        <div style="padding:12px 14px;font-size:11px;color:#0f172a;text-align:left;flex:1;">
+                            <table style="width:100%;border-collapse:collapse;">
+                                <tr>
+                                    <td style="padding:3px 0;color:#475569;width:96px;vertical-align:top;font-weight:600;">Nama Juri</td>
+                                    <td style="padding:3px 4px;width:10px;vertical-align:top;">:</td>
+                                    <td style="padding:3px 0;font-weight:800;color:#0f172a;font-size:12px;">${nama}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:3px 0;color:#475569;vertical-align:top;font-weight:600;">Cabang Lomba</td>
+                                    <td style="padding:3px 4px;vertical-align:top;">:</td>
+                                    <td style="padding:3px 0;font-weight:700;color:#065f46;">${lomba}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:3px 0;color:#475569;vertical-align:top;font-weight:600;">Posisi Tugas</td>
+                                    <td style="padding:3px 4px;vertical-align:top;">:</td>
+                                    <td style="padding:3px 0;font-weight:800;">Dewan Juri ${juriKe}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:3px 0;color:#475569;vertical-align:top;font-weight:600;">Hak Akses</td>
+                                    <td style="padding:3px 4px;vertical-align:top;">:</td>
+                                    <td style="padding:3px 0;font-weight:700;">Dewan Juri (Khusus Penilaian)</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:3px 0;color:#475569;vertical-align:top;font-weight:600;">Pilih Akun</td>
+                                    <td style="padding:3px 4px;vertical-align:top;">:</td>
+                                    <td style="padding:3px 0;font-size:10px;font-weight:700;color:#334155;">${akunLabel}</td>
+                                </tr>
+                            </table>
+                            <div style="margin-top:9px;background:#f5f3ff;border:1.5px dashed #7c3aed;border-radius:10px;padding:7px 10px;display:flex;align-items:center;justify-content:space-between;">
+                                <span style="font-size:10px;font-weight:800;color:#5b21b6;text-transform:uppercase;">Kata Sandi Login</span>
+                                <span style="font-family:monospace;font-size:15px;font-weight:900;letter-spacing:1.5px;color:#4c1d95;">${password}</span>
+                            </div>
+                        </div>
+                        <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:7px 14px;font-size:9px;color:#475569;text-align:left;line-height:1.35;">
+                            <div><b>Portal:</b> <span style="word-break:break-all;">${window.escapeHtml(portalUrl)}</span></div>
+                            <div>Login: Pilih <b>Dewan Juri</b> → Pilih Akun Juri Anda → Masukkan Kata Sandi.</div>
+                        </div>
+                    </div>`;
+            }).join('');
+
+            const gridStyle = isPrint
+                ? 'display:grid;grid-template-columns:repeat(2,1fr);gap:14px;'
+                : 'display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px;';
+
+            return `<div style="${gridStyle}">${cardsHtml}</div>`;
+        };
+
+        window.printHtmlViaIframe = function(fullHtml) {
+            const oldFrame = document.getElementById('pentasPrintIframe');
+            if (oldFrame) oldFrame.remove();
+            const iframe = document.createElement('iframe');
+            iframe.id = 'pentasPrintIframe';
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            document.body.appendChild(iframe);
+            const doc = iframe.contentWindow.document;
+            doc.open();
+            doc.write(fullHtml);
+            doc.close();
+            setTimeout(() => {
+                try {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                } catch (err) {
+                    console.error('Print error:', err);
+                }
+            }, 250);
+        };
+
+        window.cetakKartuLoginJuri = function(juriId = null) {
+            if (window.currentUserRole !== 'admin') return;
+            const list = juriId
+                ? window.dataJuri.filter(j => j.id.toString() === juriId.toString())
+                : [...window.dataJuri].sort((a, b) => (a.lomba || '').localeCompare(b.lomba || '') || (a.juriKe - b.juriKe));
+
+            if (!list || list.length === 0) {
+                Swal.fire('Belum Ada Akun Juri', 'Tambahkan akun dewan juri terlebih dahulu sebelum mencetak kartu login.', 'info');
+                return;
+            }
+
+            const previewHtml = window.buildKartuJuriHtml(list, false);
+            const printBodyHtml = window.buildKartuJuriHtml(list, true);
+            const kec = window.escapeHtml(window.namaKecamatan || 'Bantargebang');
+            const thn = window.escapeHtml(window.tahunPelaksanaan || '2026');
+
+            Swal.fire({
+                title: juriId ? 'Kartu Login Dewan Juri' : `Cetak Semua Kartu Login Juri (${list.length} Akun)`,
+                html: `<div class="max-h-[60vh] overflow-y-auto p-1">${previewHtml}</div>`,
+                width: 820,
+                showCancelButton: true,
+                confirmButtonText: '<i class="fas fa-print mr-1.5"></i> Cetak / Simpan PDF',
+                cancelButtonText: 'Tutup',
+                confirmButtonColor: '#059669'
+            }).then((res) => {
+                if (res.isConfirmed) {
+                    const fullPrintDoc = `
+                        <!DOCTYPE html>
+                        <html lang="id">
+                        <head>
+                            <meta charset="UTF-8">
+                            <title>Kartu Login Dewan Juri PENTAS PAI ${kec} ${thn}</title>
+                            <style>
+                                @page { size: A4 portrait; margin: 12mm; }
+                                * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                                body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background: #ffffff; color: #0f172a; }
+                            </style>
+                        </head>
+                        <body>
+                            ${printBodyHtml}
+                        </body>
+                        </html>`;
+                    window.printHtmlViaIframe(fullPrintDoc);
+                }
             });
         };
 
