@@ -4772,7 +4772,7 @@
         window.buildKartuJuriHtml = function(listJuri, isPrint = false) {
             const kec = window.namaKecamatan || 'Bantargebang';
             const thn = window.tahunPelaksanaan || '2026';
-            const portalUrl = window.location.origin || window.location.href.split('#')[0];
+            const portalUrl = 'pentaspaibekasiselatan.vercel.app';
             const logoHtml = (window.appLogoDataUrl && window.appLogoDataUrl.startsWith('data:image'))
                 ? `<img src="${window.appLogoDataUrl}" alt="Logo" style="width:40px;height:40px;object-fit:contain;background:#fff;border-radius:8px;padding:3px;flex-shrink:0;">`
                 : `<div style="width:40px;height:40px;border-radius:8px;background:rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;color:#fde68a;font-weight:900;font-size:15px;flex-shrink:0;">PAI</div>`;
